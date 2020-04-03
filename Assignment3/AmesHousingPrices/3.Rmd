@@ -1,0 +1,111 @@
+---
+title: "Assignment 3"
+author: "Ishwar Choudhary & Shreya Banerjee"
+date: "25/09/2019"
+output: html_document
+---
+```{r}
+#install.packages("corrgram")
+library("corrgram")
+```
+
+
+```{r}
+library("dplyr")
+library("corrplot")
+
+#install.packages('caret', repos='http://cran.us.r-project.org')
+
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+#Question 1
+<h1> Question 1 </h1>
+a) Why is it necessary to do away with multicollinearity?
+Ans : When independent variables are correlated, it indicates that changes in one variable are associated with shifts in another variable. 
+The stronger the correlation, the more difficult it is to change one variable without changing another. Hence it becomes difficult for the model to estimate the relationship between each independent variable and the dependent variable independently because the independent variables tend change and affect.
+
+b) Select only the quantitative variables and plot a correlogram to visualise the degree of
+correlation between pairs of variables. If you were to drop variables based on this plot, 
+which one(s) would you drop and why? Go ahead and drop them from the train and test set. (Consider a threshold of 0.8)
+```{r}
+#b) Correlogram visualization
+#reference : https://www.statmethods.net/advgraphs/correlograms.html ; https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
+test_df  = read.csv("test.csv")
+train_df  = read.csv("train.csv")
+
+#taking only the quantitative features
+test_quantitative = select_if(test_df, is.numeric) #this takes only the quantitative values from the df
+train_quantitative = select_if(train_df, is.numeric)
+
+M <- cor(test_quantitative)
+corrplot(M, method = "circle")
+
+N <- cor(train_quantitative)
+corrplot(N, method = "circle")
+
+#correlation cutoff
+#Reference : https://stackoverflow.com/questions/18275639/remove-highly-correlated-variables
+#dropping of variables not working
+#caret not working
+"hc = findCorrelation(M, cutoff=0.3) # putt any value as a cutoff
+hc = sort(hc)
+reduced_Data = df1[,-c(hc)]
+print (reduced_Data)
+"
+
+```
+Looking at the data, we can say that we can safely drop SqFootage, TotRmsAbvGrd as they have a very high correlation with all the other variables.
+Note: Should we drop the SqFootage ?? COz it is pretty important
+```{r}
+
+```
+
+c) 
+Pearson’s correlation coefficient cannot be used on categorical variables. Provide a suitable visualisation for the relationship between a categorical variable and the target variable. Plot this graph for the variable “OverallQuality” and indicate its relationship with the target “SalePrice”. Why is this variable categorical?
+
+```{r}
+#Ref: https://stackoverflow.com/questions/5863097/selecting-only-numeric-columns-from-a-data-frame
+#install.packages("PCAmixdata")
+library(PCAmixdata)
+```
+
+
+```{r}
+#taking only the quantitative features
+split1 <- splitmix(test_df)
+split2 <- splitmix(train_df)
+test_qualitative =split1$X.quali #this takes only the quantitative values from the df
+train_qualitative = split2$X.quali
+print(test_qualitative)
+print(train_qualitative)
+
+#need to visualise properly
+```
+#Question 2
+<h1> Question 2 </h1>
+a) Fit a linear regression model to your data, using all of the variables you decided to keep from the previous question
+Note ; Here I am fitting one based on all variables. Haven't dropped any yet
+```{r}
+#i feel TotRmsAbvGrd,Pool Area and KitchenAbvGr,X  can be dropped
+#print(test_quantitative)
+dropped_test_quantitative = subset(test_quantitative, select = -c(X,KitchenAbvGr,TotRmsAbvGrd,PoolArea) )
+print(dropped_test_quantitative)
+
+for(i in names(dropped_test_quantitative))
+{
+  print(dropped_test_quantitative$i)
+}
+
+ #linearMod <- lm(dropped_test_quantitative$SalePrice ~ i)  # build linear regression model on full data
+```
+
+
+
+
+
+

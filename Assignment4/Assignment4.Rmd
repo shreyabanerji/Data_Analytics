@@ -1,0 +1,283 @@
+---
+title: "Assignment4"
+author: "Ishwar Choudhary & Shreya Banerjee"
+date: "14/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("pracma")
+#install.packages("forecast")
+#install.packages("TTR")
+#install.packages("resample")
+#install.packages("tseries")
+#install.packages("sarima")
+#install.packages("stats")
+#install.packages("xts")
+#install.packages(c("Mcomp", "smooth"))
+#install.packages("astsa")
+#install.packages("caret")
+#install.packages("zoo")
+#install.packages("timeSeries")
+#install.packages("tidyquant")
+```
+
+```{r}
+#reading the data
+test_df = read.csv("DailyDelhiClimateTrain.csv", stringsAsFactors = FALSE)
+```
+<H2>1</H2>
+
+a) Plot the meantemp variable across the dataset. (1 point)
+Note: Make sure you interpolate the data (linear interpolation) before plotting. (Use this interpolated data for further use as well)
+```{r}
+#ref: http://dwoll.de/rexrepos/posts/diagSplines.html
+ts<-ts(test_df$meantemp)
+plot(ts)
+
+```
+
+b) Calculate a Moving Average filter for the mean temperature with
+i) A10-tap 1[1, 1, 1, 1, 1, 1, 1, 1, 1, 1] filter
+ii) A weighted average 1 [1.5, 1.5, 1, 0.5, 0.5, 0.5, 0.5, 1, 1.5, 1.5] filter. 10
+Plot the graph after smoothing it with the above two filters. What are your observations?
+
+```{r}
+#https://www.rdocumentation.org/packages/pracma/versions/1.9.9/topics/movavg
+#http://macs.citadel.edu/wittman/490/Lectures/Lec3_490.pdf
+
+#(i)
+require(smooth)
+require(Mcomp)
+library("pracma")
+library("TTR")
+width = 10
+avg = ts(movavg(test_df$meantemp, n=width, type=c("s")))
+print(head(avg,50))
+plot(avg,xlab='Time',ylab='Temperature')
+ptsSpline = approx(test_df$meantemp)
+lines(ptsSpline, col="blue", lwd=2)
+legend(x="topleft", c("Data", "Filtered"),
+       pch=c(16, NA), lty=c(NA,1),lwd=c(5,2),
+       col=c("black", "blue"), bg="white")
+
+#(ii)
+
+avg_wma<-WMA(test_df$meantemp, n = 10, wts = c(1.5, .5, 1, 0.5, 0.5, 0.5, 0.5, 1, 1.5, 1.5))
+plot(avg_wma,xlab='Time',ylab='Temperature',type='lines')
+
+ptsSpline2 = approx(test_df$meantemp)
+lines(ptsSpline2, col="blue", lwd=2)
+legend(x="topleft", c("Data", "Filtered"),
+       pch=c(16, NA), lty=c(NA,1),
+       col=c("black", "blue"), bg="white")
+
+
+```
+
+c) How does resampling help a time-series data? Resample the meantemp data
+i) Hourly
+ii) Weekly
+iii) Monthly
+iv) Quarterly
+Which of these capture the essence of the dataset? Why? (2 points)
+```{r}
+#DO THIS PROPER
+library(xts)
+library(caret)
+library(zoo)
+library(data.table)
+library(timeSeries)
+library(xts)
+library(tidyquant)
+
+# convert daily data
+a<-data.frame(ts(test_df$meantemp),as.Date(test_df$date))
+names(a)<-c("temp","date")
+ts_h<-a %>%
+  tq_transmute(select     = temp,
+               mutate_fun = to.hourly,
+               FUN        = to.hourly)
+names(ts_h) <- c("date", "mean_temp_hourly")
+ts_h$date <- format(as.Date(ts_h$date), c("%Y-%m-%d %H"))
+
+
+ts_w<-a %>%
+  tq_transmute(select     = temp,
+               mutate_fun = apply.weekly,
+               FUN        = mean)
+names(ts_w) <- c("date", "mean_temp_hourly")
+ts_w$date <- format(as.Date(ts_w$date), "%Y-%m-%U")
+
+ts_m<-a %>%
+  tq_transmute(select     = temp,
+               mutate_fun = apply.monthly,
+               FUN        = mean)
+names(ts_m) <- c("date", "mean_temp_month")
+ts_m$date <- format(as.Date(ts_m$date), "%Y-%m")
+
+ts_q<-a %>%
+  tq_transmute(select     = temp,
+               mutate_fun = apply.quarterly,
+               FUN        = mean)
+names(ts_q) <- c("date", "mean_temp_quarter")
+ts_q$date <- format(as.Date(ts_q$date), "%Y-%m")
+
+
+print(ts_h)
+print(ts_w)
+print(ts_m)
+print(ts_q)
+```
+<H2>2</H2>
+a)
+i) Decompose the Monthly resampled data into trend, seasonality and residual. Is it
+an additive or multiplicative series? (2 points)
+ii) Plot the ACF and PACF plots for the meantemp series. What can you conclude
+from the plots? (2 points)
+```{r}
+
+#let's get the trend, seasonality and residual
+#install.packages("forecast")
+library(forecast)
+
+
+
+#Ref:https://anomaly.io/seasonal-trend-decomposition-in-r/index.html
+
+#additive trend part
+trend = ma(ts_m$mean_temp_month, order = 7, centre = T)
+#normal plot
+plot(as.ts(ts_m$mean_temp_month),ylab='Tempearature')
+#trend plot
+lines(trend,col="blue", lwd=2)
+legend(x="topleft", c("Data", "Trend"),
+       pch=c(16, NA), lty=c(NA,1),lwd=c(5,2),
+       col=c("black", "blue"), bg="white")
+
+#seasonality
+m = t(matrix(data = ts_m$mean_temp_month, nrow = 7))
+seasonal = colMeans(m, na.rm = T)
+plot(as.ts(rep(seasonal,16)),ylab='Seasonality')
+
+
+
+#residuals
+random = ts_m$mean_temp_month - trend - seasonal
+plot(as.ts(random),ylab='residuals')
+
+
+#reconstructing to check
+recomposed_add = trend+random+seasonal
+#recomposed_mul=trend*random*seasonal
+plot(as.ts(recomposed_add))
+#plot(as.ts(recomposed_mul))
+
+
+#It is an additive series.
+
+
+```
+ii) Plot the ACF and PACF plots for the meantemp series. What can you conclude
+from the plots? (2 points)
+```{r}
+#ref: https://datascience.stackexchange.com/questions/20371/plot-of-acf-pacf
+#I have then decomposed the series to obtain the seasonal component from it. Subtracted the seasonal component from it to deseasonalize it.
+
+#CHECK THIS ONCE 
+data1 = test_df$meantemp
+acf(data1)
+pacf(data1)
+```
+Since the acf graph drops gradually, it is a non-stationary signal.
+
+
+b) Is the meantemp a stationary time series? (3 points)
+i) Provide one statistical and one non-statistical test to support your claim.
+ii) If it isn’t stationary convert it to stationary using 1st order differentials. Perform
+Augmented Dickey Fuller test to verify that it is indeed stationary.
+Ans,
+i)Non-statistical test: 1)Since the acf graph drops gradually, it is a non-stationary signal.
+
+```{r}
+#ref: https://towardsdatascience.com/stationarity-in-time-series-analysis-90c94f27322
+#ref https://towardsdatascience.com/detecting-stationarity-in-time-series-data-d29e0a21e638
+
+
+library(tseries)
+#StatisticalTest
+adf.test(test_df$meantemp)
+#cannot reject null hypothesis
+#p-value=0.6407 , might be non stationary
+ts_diff1 <- diff(test_df$meantemp, lag = 1) 
+acf(ts_diff1)
+adf.test(ts_diff1)
+pacf(ts_diff1)
+#p-value=-0.01, can reject null hyposthesis, stationary
+```
+
+Question 3 (5 points)
+a) What is the major problem with ARIMA? How does SARIMA help overcome the problem? Get the best parameter for the SARIMA model using AIC metric.
+(Hint: Use statsmodels.tsa.statespace.SARIMAX())(3 points)
+Note: Use the insights from previous ACF and PACF plots to fill up model parameters for
+SARIMA. Other unknown parameters can be found out through grid search.
+
+Ans:
+ref: https://www.machinelearningplus.com/time-series/arima-model-time-series-forecasting-python/
+If there is an unusual growth or slowdown in the series ARIMA fails terribly.
+It is better to go for SARIMA. It captures both trend and seasonality better. 
+It captures trend with nonseasonal differencing and seasonality with seasonal differencing.
+
+```{r}
+set.seed(250)
+library(stats)
+library(sarima)
+library(forecast)
+library(astsa)
+test_data = read.csv("DailyDelhiClimateTest.csv")
+
+a=test_df$meantemp
+a <- ts(test_df$meantemp, start=c(2013, 1), end=c(2017, 1), frequency=365)
+#Looking at the ACF plot after 1st order differential(d=1),p=3(number of spikes in PACF graph)and q=1(number of spikes in ACF graph) seems to be the best parameters.
+ar<-auto.arima(a,seasonal=TRUE)
+#auto.arima automatically finds the best parameters for ARIMA model(using AIC,BIC and other metrics) along with the seasonal component
+ar
+
+#BestParameters: ARIMA(3,1,1)(0,1,0)[365] 
+```
+
+
+
+Question 3 (5 points)
+
+b) Use the best parameter obtained to forecast the values for the testing dataset given. Plot the forecasted and actual values together in the same graph. Did the model perform as per expectations, why / why not? Report the testing RMSE of the model. (2 points)
+
+```{r}
+library(Metrics)
+library(forecast)
+library(fracdiff)
+forecasted_data<-forecast(ar,h=114)
+forecasted_data
+plot(forecasted_data)
+#the forecasted values seem to be following the general trend
+# define 3 data sets
+ xdata <- sort(test_data$date)
+ y1 <- test_data$meantemp
+ y2 <- forecasted_data$mean
+
+ plot(xdata, y1, type="lines", col="blue", pch="o",ylim=c(0,40))
+ points(xdata, y2, col="red", pch="*",type='lines')
+legend(x="topleft", c("OriginalData", "Forecasted Data"),
+       pch=c(16, NA), lty=c(NA,1),
+       col=c("black", "red"), bg="white")
+rmse(y1,y2)
+#4.35736
+
+```
+Question 4 (3 points)
+a) How would you make use of the other features in the dataset to predict the weather on a particular day in Delhi? What new features would you engineer? (2 points)
+b) LSTM (Long Short term memory network) are popularly used to forecast time series data. Why do you think they are used? (1 point)
+
+a)Other features can be used to predict ranifall(from humidity level) and occurence of a storm(wind_speed). I would use features like air-qualtiy index for this.
+b)LSTMs have an edge over conventional feed-forward neural networks and RNN in many ways. This is because of their property of selectively remembering patterns for long durations of time.

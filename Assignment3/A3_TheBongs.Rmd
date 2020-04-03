@@ -1,0 +1,256 @@
+---
+title: "Assignment 3"
+author: "Ishwar Choudhary & Shreya Banerjee"
+date: "25/09/2019"
+output: html_document
+---
+```{r}
+#q1
+#install.packages("corrgram")
+#install.packages("Metrics")
+#install.packages('caret', repos='http://cran.us.r-project.org')
+#install.packages("PCAmixdata")
+
+#q4
+#install.packages("glmnet")
+#install.packages("psych")
+#install.packages("Metrics")
+
+```
+
+```{r}
+path="/Users/shreyabanerjee/DA_Assignments/Assignment3"
+```
+
+
+```{r}
+library("corrgram")
+library("Metrics")
+library("dplyr")
+library("corrplot")
+library(PCAmixdata)
+require(data.table)
+set.seed(123)
+library(glmnet) 
+library(dplyr)   
+library(psych)
+library(Metrics)
+
+
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+#Question 1
+<h1> Question 1 </h1><BR>
+a)  When independent variables are correlated, it indicates that changes in one variable are associated with shifts in another variable. <BR>
+The stronger the correlation, the more difficult it is to change one variable without changing another. Hence it becomes difficult for the model to estimate the relationship between each independent variable and the dependent variable independently because the independent variables tend change and affect.
+<br>
+b) Select only the quantitative variables and plot a correlogram to visualise the degree of
+correlation between pairs of variables. If you were to drop variables based on this plot, 
+which one(s) would you drop and why? Go ahead and drop them from the train and test set. (Consider a threshold of 0.8)<br>
+```{r}
+#b) Correlogram visualization
+#reference : https://www.statmethods.net/advgraphs/correlograms.html ; https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
+test_df  = read.csv("AmesHousingPrices/test.csv")
+train_df  = read.csv("AmesHousingPrices/train.csv")
+
+#taking only the quantitative features
+test_quantitative = select_if(test_df, is.numeric) #this takes only the quantitative values from the df
+train_quantitative = select_if(train_df, is.numeric)
+
+M <- cor(test_quantitative)
+corrplot(M, method = "circle")
+
+N <- cor(train_quantitative)
+corrplot(N, method = "circle")
+
+#correlation cutoff
+#Reference : https://stackoverflow.com/questions/18275639/remove-highly-correlated-variables
+
+
+```
+<br>
+Looking at the data, we can say that we can safely drop SqFootage, TotRmsAbvGrd as they have a very high correlation with all the other variables.
+<br>
+
+c) 
+Pearson’s correlation coefficient cannot be used on categorical variables. Provide a suitable visualisation for the relationship between a categorical variable and the target variable. Plot this graph for the variable “OverallQuality” and indicate its relationship with the target “SalePrice”. Why is this variable categorical?
+<br>
+
+
+```{r}
+#Ref: https://stackoverflow.com/questions/5863097/selecting-only-numeric-columns-from-a-data-frame
+#taking only the quantitative features
+split1 <- splitmix(test_df)
+split2 <- splitmix(train_df)
+test_qualitative =split1$X.quali #this takes only the quantitative values from the df
+train_qualitative = split2$X.quali
+#print(test_qualitative)
+#print(train_qualitative)
+
+train_qualitative$SalePrice = train_df$SalePrice
+
+avg = aggregate(train_qualitative$SalePrice, by=list(Street=train_qualitative$Street), FUN=mean)
+barplot(avg$x, main="Sale Prices",ylab="Prices",xlab="Type of Street",names.arg=avg$Street)
+
+avg = aggregate(train_qualitative$SalePrice, by=list(Street=train_qualitative$RoofStyle), FUN=mean)
+barplot(avg$x, main="Sale Prices",ylab="Prices",xlab="Roof Style",names.arg=avg$Street)
+
+avg = aggregate(train_qualitative$SalePrice, by=list(Street=train_qualitative$Foundation), FUN=mean)
+barplot(avg$x, main="Sale Prices",ylab="Prices",xlab="Type of Foundation",names.arg=avg$Street)
+
+avg = aggregate(train_qualitative$SalePrice, by=list(Street=train_qualitative$Heating), FUN=mean)
+barplot(avg$x, main="Sale Prices",ylab="Prices",xlab="Type of Heating",names.arg=avg$Street)
+
+avg = aggregate(train_qualitative$SalePrice, by=list(Street=train_qualitative$CentralAir), FUN=mean)
+barplot(avg$x, main="Sale Prices",ylab="Prices",xlab="Type of Airconditioning",names.arg=avg$Street)
+
+
+```
+
+<h1> Question 2 </h1><br>
+a)
+
+```{r}
+#LINEAR MODEL 1
+
+linear_model1=lm(SalePrice ~ LotArea+OverallQual+factor(RoofStyle)+factor(Foundation)+factor(CentralAir)+GrLivArea+FullBath+HalfBath+BedroomAbvGr+factor(KitchenQual)+TotRmsAbvGrd+Fireplaces+GarageCars+GarageArea+PoolArea+SqFootage, data = train_df)
+print(summary(linear_model1))
+res = resid(linear_model1)
+plot(res)
+```
+<br> b)An ideal residual plot should not have any trend or any outliers. Here, most of the point are concentrated around the zero but one point is far away(outlier).<br>
+c)
+```{r}
+hist(train_df$SalePrice,xlab="SalePrice",main="Histogram of Sale Price")
+```
+Since the histogram is right skewed, log transformation can be applied to make it normal.
+
+```{r}
+hist(log1p(train_df$SalePrice),xlab="log(SalePrice)",main="Histogram of log(Sale Price)")
+```
+<br>
+The histogram attains normal distribution after applying log transformation.
+<br>
+```{r}
+#LINEAR MODEL 2
+#The second model is built after applying log transformation on the dependent variable
+linear_model2=lm(log1p(SalePrice) ~LotArea+OverallQual+factor(RoofStyle)+factor(Foundation)+factor(CentralAir)+GrLivArea+FullBath+HalfBath+BedroomAbvGr+factor(KitchenQual)+TotRmsAbvGrd+Fireplaces+GarageCars+GarageArea+PoolArea+SqFootage, data = train_df)
+print(summary(linear_model2))
+res2 = resid(linear_model2)
+plot(res2)
+```
+<br>The residual plot of linear model2(i.e,after applying log transformation) does not show any trend. It is more scattered than the residual plot linear model1 i.e, the model before applying transformation.This can be inferred by observing the range of y-axis in the residual plots.
+<br>
+d)
+For model 1, we can clearly detect an outlier. Moreover the residual is clustered.(not normally distributed)
+For model 2, the plot is comparitively scattered and there is no outlier as such.(approximately normally distributed)
+
+<br>
+
+<h2>Question 3</h2>
+R-squared is a statistical measure that represents the goodness of fit of a regression model. The ideal value for r-square is 1. 
+The closer the value of r-square to 1, the better is the model fitted.
+R-square is a comparison of residual sum of squares (SSres) with total sum of squares(SStot). 
+Total sum of squares is calculated by summation of squares of perpendicular distance between data points and the average line.
+<br>
+The R-squared values are:
+Model 1:0.7241
+Model 2:0.747
+<br>
+Both R-squared values are very similar suggesting both models are equally good but the log-transformed model seems to be a little better.
+<br>
+R-squared is not a reliable measure as it can be close to 1 for a completely wrong predictive model too.
+
+<br>
+
+```{r}
+#calculating mae for test.csv
+predictions1 = predict.lm(linear_model1, test_df)
+predictions2 = predict.lm(linear_model2, test_df)
+mae1=mae(test_df$SalePrice,predictions1)
+mae2=mae(test_df$SalePrice,exp(predictions2))
+print(mae1)    #before the transformation
+print(mae2)   #after the transformation
+```
+
+
+<h1>Question 4</h1>
+a)
+When the model fits the training data but does not have a good predicting performance and generalization power, we use Regularisation. It is mostly used to avoid overfitting.
+<br>
+b)
+```{r}
+data1=fread("ShenzhenHousingPrices/train.csv")
+data_test=fread("ShenzhenHousingPrices/test.csv")
+
+
+# Center y, X will be standardized in the modelling function
+y <- data1 %>% select(SalePrice) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
+X1 <- data1 %>% select(-SalePrice) 
+X <-model.matrix(~.,data=X1)  #assigns dummy variables to the factor and leaves the numeric variables alone
+
+# Perform 10-fold cross-validation to select lambda
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+# Setting alpha = 0 implements ridge regression
+ridge_cv <- cv.glmnet(X, y, alpha = 0, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+#X is the matrix of input observations
+#y is the vector of responses
+#lambda is the vector of penalty terms
+
+# Best cross-validated lambda
+lambda_cv <- ridge_cv$lambda.min
+
+
+y2 <- data_test %>% select(SalePrice) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
+X_ <- data_test %>% select(-SalePrice) 
+X2 <-model.matrix(~.,data=X_)
+
+#fitting the model for test data
+test_cv <- glmnet(X2, y2, alpha = 0, lambda = lambda_cv, standardize = TRUE)
+
+y_hat <- predict(test_cv, X2)
+ssr <- t(y2 - y_hat) %*% (y2 - y_hat)
+rsq_ridge <- cor(y2, y_hat)^2
+
+rmse_=rmse(y2,y_hat)
+
+print(rsq_ridge)
+print(rmse_)
+```
+
+
+c)
+```{r}
+# Perform 10-fold cross-validation to select lambda
+lambdas_to_try <- 10^seq(-3, 6, length.out = 100)
+
+# Setting alpha = 1 implements lasso regression
+lasso_cv <- cv.glmnet(X, y, alpha = 1, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+
+# Best cross-validated lambda
+lambda_lasso <- lasso_cv$lambda.min
+
+#fitting the model for test data
+test_lasso_cv <- glmnet(X2, y2, alpha = 1, lambda = lambda_lasso, standardize = TRUE)
+
+#predicted values of y for test data
+y_hat_lasso <- predict(test_lasso_cv, X2)
+ssr_lasso <- t(y2 - y_hat_lasso) %*% (y2 - y_hat_lasso)
+rsq_lasso <- cor(y2, y_hat_lasso)^2
+rmse_2=rmse(y2,y_hat_lasso)
+print(rsq_lasso)
+print(rmse_2)
+```
+
+d)
+Ridge regression adds “squared magnitude” of coefficient as penalty term to the loss function.
+Lasso Regression adds “absolute value of magnitude” of coefficient as penalty term to the loss function.
+“Ridge regression” uses all predictors in the final model whereas “Lasso regression” can be used for feature selection because coefficient values can be zero.
+
